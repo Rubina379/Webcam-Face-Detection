@@ -1,44 +1,57 @@
 import cv2
+import streamlit as st
 from datetime import datetime
 import os
+
+# --- Streamlit UI Setup ---
+st.set_page_config(page_title="Face Detection App", layout="wide")
+st.title("📸 Real-Time Face Detection")
+st.sidebar.header("Detection Info")
 
 # --- Load Haar Cascade ---
 haar_cascade_path = 'haar_face.xml'
 if not os.path.exists(haar_cascade_path):
-    print("🔍 Custom Haar cascade not found. Falling back to OpenCV default.")
+    st.warning("Custom Haar cascade not found. Using OpenCV default.")
     haar_cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
 
 face_cascade = cv2.CascadeClassifier(haar_cascade_path)
 
-# --- Initialize Webcam ---
-cap = cv2.VideoCapture(0)
-if not cap.isOpened():
-    raise IOError("❌ Webcam access failed. Please verify your device and permissions.")
+# --- Webcam Start ---
+run = st.checkbox("Start Webcam")
+save_faces = st.sidebar.checkbox("Save Detected Faces")
 
-print("✅ Webcam initialized. Press 'q' to exit.")
+FRAME_WINDOW = st.image([])
 
-try:
-    while True:
+if run:
+    cap = cv2.VideoCapture(0)
+    st.sidebar.success("Webcam is running...")
+
+    while run:
         ret, frame = cap.read()
         if not ret:
-            print("⚠️ Frame capture failed. Exiting loop.")
+            st.error("Failed to read frame from webcam.")
             break
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
 
-        for (x, y, w, h) in faces:
+        face_count = len(faces)
+        st.sidebar.metric("Faces Detected", face_count)
+
+        for i, (x, y, w, h) in enumerate(faces):
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             cv2.putText(frame, timestamp, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
 
-        cv2.imshow('📷 Real-Time Face Detection', frame)
+            if save_faces:
+                face_img = frame[y:y+h, x:x+w]
+                filename = f"face_{i}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                cv2.imwrite(filename, face_img)
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            print("👋 Quitting application...")
-            break
+        FRAME_WINDOW.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
 
-finally:
     cap.release()
-    cv2.destroyAllWindows()
-    print("🧹 Resources released. Application closed.")
+else:
+    st.info("Check the box above to start webcam.")
+
+``
